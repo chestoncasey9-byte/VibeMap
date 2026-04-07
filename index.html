@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>VibeMap</title>
+  <meta name="description" content="Drop your vibe. See the world's mood in real time." />
+  <meta name="theme-color" content="#0a0a0f" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --accent: #7c6dfa;
+      --accent2: #fa6d9a;
+      --text: #e8e8f0;
+      --muted: #5a5a7a;
+      --pro: #f5c842;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── MAP ── */
+    #map {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .leaflet-tile-pane { filter: brightness(0.45) saturate(0.6); }
+    .leaflet-control-zoom { display: none; }
+    .leaflet-control-attribution { display: none; }
+
+    /* ── HEADER ── */
+    #header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      background: linear-gradient(to bottom, rgba(10,10,15,0.95) 60%, transparent);
+    }
+
+    #logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 2px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    #logo span {
+      color: var(--accent);
+    }
+
+    #pro-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      color: var(--pro);
+      border: 1px solid var(--pro);
+      background: rgba(245,200,66,0.08);
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #pro-btn:hover { background: rgba(245,200,66,0.18); }
+
+    /* ── VIBE PICKER ── */
+    #vibe-panel {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 16px 20px 32px;
+      background: linear-gradient(to top, rgba(10,10,15,0.98) 70%, transparent);
+    }
+
+    #vibe-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    #vibe-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .vibe-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 4px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .vibe-btn:active { transform: scale(0.92); }
+
+    .vibe-btn.selected {
+      border-color: var(--accent);
+      background: rgba(124,109,250,0.15);
+      box-shadow: 0 0 12px rgba(124,109,250,0.25);
+    }
+
+    .vibe-emoji { font-size: 22px; line-height: 1; }
+    .vibe-name {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 9px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1;
+    }
+
+    .vibe-btn.selected .vibe-name { color: var(--accent); }
+
+    #drop-btn {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #drop-btn:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: default;
+    }
+
+    #drop-btn:not(:disabled):active { transform: scale(0.97); }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      padding: 10px 20px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 200;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── PRO MODAL ── */
+    #pro-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: none;
+      align-items: flex-end;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+    }
+
+    #pro-modal.open { display: flex; }
+
+    #pro-sheet {
+      width: 100%;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      padding: 28px 24px 48px;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    #pro-sheet h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px;
+      letter-spacing: 2px;
+      color: var(--pro);
+      margin-bottom: 6px;
+    }
+
+    #pro-sheet p {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .pro-feature {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+
+    .pro-feature-icon {
+      width: 36px; height: 36px;
+      background: rgba(245,200,66,0.1);
+      border: 1px solid rgba(245,200,66,0.2);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    #pro-cta {
+      width: 100%;
+      margin-top: 24px;
+      padding: 16px;
+      background: var(--pro);
+      color: #0a0a0f;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 3px;
+      cursor: pointer;
+    }
+
+    #pro-close {
+      position: absolute;
+      top: 20px; right: 20px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    /* ── VIBE MARKER ── */
+    .vibe-marker {
+      font-size: 20px;
+      line-height: 1;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7));
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+
+    /* ── LIVE PULSE ── */
+    #live-indicator {
+      position: fixed;
+      top: 72px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    .pulse-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── LOCATION PIN ── */
+    #locate-btn {
+      position: fixed;
+      bottom: 230px;
+      right: 20px;
+      z-index: 100;
+      width: 44px; height: 44px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- HEADER -->
+<div id="header">
+  <div id="logo">Vibe<span>Map</span></div>
+  <button id="pro-btn">✦ VIBE PRO</button>
+</div>
+
+<!-- LIVE INDICATOR -->
+<div id="live-indicator">
+  <div class="pulse-dot"></div>
+  LIVE
+</div>
+
+<!-- LOCATE -->
+<button id="locate-btn" title="My location">📍</button>
+
+<!-- VIBE PANEL -->
+<div id="vibe-panel">
+  <div id="vibe-label">Drop your vibe</div>
+  <div id="vibe-grid">
+    <button class="vibe-btn" data-vibe="happy" data-emoji="😊">
+      <span class="vibe-emoji">😊</span>
+      <span class="vibe-name">Happy</span>
+    </button>
+    <button class="vibe-btn" data-vibe="chill" data-emoji="😌">
+      <span class="vibe-emoji">😌</span>
+      <span class="vibe-name">Chill</span>
+    </button>
+    <button class="vibe-btn" data-vibe="hyped" data-emoji="🔥">
+      <span class="vibe-emoji">🔥</span>
+      <span class="vibe-name">Hyped</span>
+    </button>
+    <button class="vibe-btn" data-vibe="sad" data-emoji="😢">
+      <span class="vibe-emoji">😢</span>
+      <span class="vibe-name">Sad</span>
+    </button>
+    <button class="vibe-btn" data-vibe="anxious" data-emoji="😰">
+      <span class="vibe-emoji">😰</span>
+      <span class="vibe-name">Anxious</span>
+    </button>
+    <button class="vibe-btn" data-vibe="angry" data-emoji="😤">
+      <span class="vibe-emoji">😤</span>
+      <span class="vibe-name">Angry</span>
+    </button>
+    <button class="vibe-btn" data-vibe="loved" data-emoji="🥰">
+      <span class="vibe-emoji">🥰</span>
+      <span class="vibe-name">Loved</span>
+    </button>
+    <button class="vibe-btn" data-vibe="bored" data-emoji="😑">
+      <span class="vibe-emoji">😑</span>
+      <span class="vibe-name">Bored</span>
+    </button>
+    <button class="vibe-btn" data-vibe="grateful" data-emoji="🙏">
+      <span class="vibe-emoji">🙏</span>
+      <span class="vibe-name">Grateful</span>
+    </button>
+    <button class="vibe-btn" data-vibe="lost" data-emoji="😵">
+      <span class="vibe-emoji">😵</span>
+      <span class="vibe-name">Lost</span>
+    </button>
+  </div>
+  <button id="drop-btn" disabled>SELECT A VIBE</button>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- PRO MODAL -->
+<div id="pro-modal">
+  <div id="pro-sheet" style="position:relative">
+    <button id="pro-close">✕</button>
+    <h2>VIBE PRO ✦</h2>
+    <p>Unlock the full emotional spectrum and see who's vibing near you.</p>
+    <div class="pro-feature">
+      <div class="pro-feature-icon">🗺️</div>
+      <div>Vibe heatmap overlay — see emotional density across cities</div>
+    </div>
+    <div class="pro-feature">
+      <div class="pro-feature-icon">📊</div>
+      <div>Your vibe history and mood trends over time</div>
+    </div>
+    <div class="pro-feature">
+      <div class="pro-feature-icon">⚡</div>
+      <div>Unlimited vibe drops — no cooldown</div>
+    </div>
+    <div class="pro-feature">
+      <div class="pro-feature-icon">🔔</div>
+      <div>Alerts when your area hits a mood shift</div>
+    </div>
+    <button id="pro-cta">GET VIBE PRO — $2.99/MO</button>
+  </div>
+</div>
+
+<script>
+  // ── SUPABASE ──
+  const SUPABASE_URL = 'https://ppquledywoivtqhmfjla.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_C05e3lzQLs51Fr_Gfj2v_w_z77bUIls';
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // ── MAP ──
+  const map = L.map('map', {
+    zoomControl: false,
+    attributionControl: false,
+  }).setView([20, 0], 2);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // ── STATE ──
+  let selectedVibe = null;
+  let selectedEmoji = null;
+  let userLat = null;
+  let userLng = null;
+  let cooldown = false;
+  const COOLDOWN_MS = 60000; // 1 min between drops
+
+  // ── VIBE SELECTION ──
+  document.querySelectorAll('.vibe-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.vibe-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedVibe = btn.dataset.vibe;
+      selectedEmoji = btn.dataset.emoji;
+      const dropBtn = document.getElementById('drop-btn');
+      dropBtn.disabled = false;
+      dropBtn.textContent = `DROP ${selectedVibe.toUpperCase()} VIBE`;
+    });
+  });
+
+  // ── TOAST ──
+  function showToast(msg, duration = 2500) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), duration);
+  }
+
+  // ── ADD MARKER ──
+  function addVibeMarker(lat, lng, emoji) {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="vibe-marker">${emoji}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+    L.marker([lat, lng], { icon }).addTo(map);
+  }
+
+  // ── LOAD EXISTING VIBES ──
+  async function loadVibes() {
+    const { data, error } = await db
+      .from('vibes')
+      .select('lat, lng, vibe')
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (error) { console.error(error); return; }
+
+    const emojiMap = {
+      happy: '😊', chill: '😌', hyped: '🔥', sad: '😢',
+      anxious: '😰', angry: '😤', loved: '🥰', bored: '😑',
+      grateful: '🙏', lost: '😵'
+    };
+
+    data.forEach(v => addVibeMarker(v.lat, v.lng, emojiMap[v.vibe] || '❓'));
+  }
+
+  // ── REALTIME ──
+  db.channel('vibes-live')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vibes' }, payload => {
+      const v = payload.new;
+      const emojiMap = {
+        happy: '😊', chill: '😌', hyped: '🔥', sad: '😢',
+        anxious: '😰', angry: '😤', loved: '🥰', bored: '😑',
+        grateful: '🙏', lost: '😵'
+      };
+      addVibeMarker(v.lat, v.lng, emojiMap[v.vibe] || '❓');
+    })
+    .subscribe();
+
+  // ── GEOLOCATION ──
+  function getLocation(callback) {
+    if (!navigator.geolocation) {
+      showToast('Geolocation not supported');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+        callback && callback(userLat, userLng);
+      },
+      () => showToast('Could not get your location')
+    );
+  }
+
+  document.getElementById('locate-btn').addEventListener('click', () => {
+    getLocation((lat, lng) => {
+      map.setView([lat, lng], 13, { animate: true });
+    });
+  });
+
+  // ── DROP VIBE ──
+  document.getElementById('drop-btn').addEventListener('click', async () => {
+    if (!selectedVibe) return;
+    if (cooldown) { showToast('⏳ Wait before dropping again'); return; }
+
+    const drop = async (lat, lng) => {
+      const btn = document.getElementById('drop-btn');
+      btn.disabled = true;
+      btn.textContent = 'DROPPING...';
+
+      const { error } = await db.from('vibes').insert({ lat, lng, vibe: selectedVibe });
+
+      if (error) {
+        showToast('❌ Drop failed — try again');
+        btn.disabled = false;
+        btn.textContent = `DROP ${selectedVibe.toUpperCase()} VIBE`;
+        return;
+      }
+
+      showToast(`${selectedEmoji} Vibe dropped!`);
+      map.setView([lat, lng], 13, { animate: true });
+
+      cooldown = true;
+      setTimeout(() => { cooldown = false; }, COOLDOWN_MS);
+
+      // reset selection
+      document.querySelectorAll('.vibe-btn').forEach(b => b.classList.remove('selected'));
+      selectedVibe = null;
+      selectedEmoji = null;
+      btn.disabled = true;
+      btn.textContent = 'SELECT A VIBE';
+    };
+
+    if (userLat && userLng) {
+      drop(userLat, userLng);
+    } else {
+      getLocation((lat, lng) => drop(lat, lng));
+    }
+  });
+
+  // ── PRO MODAL ──
+  document.getElementById('pro-btn').addEventListener('click', () => {
+    document.getElementById('pro-modal').classList.add('open');
+  });
+  document.getElementById('pro-close').addEventListener('click', () => {
+    document.getElementById('pro-modal').classList.remove('open');
+  });
+  document.getElementById('pro-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('pro-modal'))
+      document.getElementById('pro-modal').classList.remove('open');
+  });
+  document.getElementById('pro-cta').addEventListener('click', () => {
+    showToast('Stripe coming soon ✦');
+    document.getElementById('pro-modal').classList.remove('open');
+  });
+
+  // ── INIT ──
+  loadVibes();
+  getLocation(); // prefetch location silently
+</script>
+</body>
+</html>
