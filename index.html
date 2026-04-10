@@ -58,7 +58,7 @@
       z-index: 0;
     }
 
-    .leaflet-tile-pane { filter: brightness(1) saturate(0.9); }
+    .leaflet-tile-pane { filter: brightness(1.1) saturate(1); }
     .leaflet-control-zoom { display: none; }
     .leaflet-control-attribution { display: none; }
 
@@ -601,8 +601,13 @@
     attributionControl: false,
   }).setView([20, 0], 2);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
     maxZoom: 19
+  }).addTo(map);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    opacity: 0.8
   }).addTo(map);
 
   // ── STATE ──
