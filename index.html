@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>VibeMap</title>
   <meta name="description" content="Drop your vibe. See the world's mood in real time." />
-  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="theme-color" content="#070709" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -23,14 +23,22 @@
 
   <style>
     :root {
-      --bg: #0a0a0f;
-      --surface: #12121a;
-      --border: #1e1e2e;
-      --accent: #7c6dfa;
-      --accent2: #fa6d9a;
-      --text: #e8e8f0;
-      --muted: #5a5a7a;
-      --pro: #f5c842;
+      --bg: #070709;
+      --surface: #0e0e14;
+      --surface2: #13131c;
+      --border: #1c1c28;
+      --border2: #252535;
+      --accent: #8b7dff;
+      --accent-dim: rgba(139,125,255,0.12);
+      --accent-glow: rgba(139,125,255,0.35);
+      --accent2: #ff6b9d;
+      --accent2-dim: rgba(255,107,157,0.1);
+      --text: #ececf4;
+      --text2: #9090b0;
+      --muted: #44445a;
+      --pro: #f0c040;
+      --pro-dim: rgba(240,192,64,0.1);
+      --pro-glow: rgba(240,192,64,0.3);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -50,9 +58,30 @@
       z-index: 0;
     }
 
-    .leaflet-tile-pane { filter: brightness(0.45) saturate(0.6); }
+    .leaflet-tile-pane { filter: brightness(0.35) saturate(0.5) hue-rotate(10deg); }
     .leaflet-control-zoom { display: none; }
     .leaflet-control-attribution { display: none; }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    /* ── VIGNETTE ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(7,7,9,0.7) 100%);
+      pointer-events: none;
+    }
 
     /* ── HEADER ── */
     #header {
@@ -62,59 +91,113 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 20px 12px;
-      background: linear-gradient(to bottom, rgba(10,10,15,0.95) 60%, transparent);
+      padding: 18px 20px 20px;
+      background: linear-gradient(to bottom, rgba(7,7,9,0.97) 55%, transparent);
     }
 
     #logo {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px;
-      letter-spacing: 2px;
+      font-size: 30px;
+      letter-spacing: 3px;
       color: var(--text);
       line-height: 1;
+      text-shadow: 0 0 30px rgba(139,125,255,0.3);
     }
 
     #logo span {
       color: var(--accent);
     }
 
+    #logo-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
     #pro-btn {
       font-family: 'DM Mono', monospace;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 500;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
       color: var(--pro);
-      border: 1px solid var(--pro);
-      background: rgba(245,200,66,0.08);
-      padding: 6px 14px;
-      border-radius: 20px;
+      border: 1px solid rgba(240,192,64,0.35);
+      background: var(--pro-dim);
+      padding: 7px 14px;
+      border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s;
+      text-transform: uppercase;
     }
-    #pro-btn:hover { background: rgba(245,200,66,0.18); }
+    #pro-btn:hover, #pro-btn:active {
+      background: rgba(240,192,64,0.18);
+      border-color: rgba(240,192,64,0.6);
+      box-shadow: 0 0 16px var(--pro-glow);
+    }
 
-    /* ── VIBE PICKER ── */
+    /* ── LIVE INDICATOR ── */
+    #live-indicator {
+      position: fixed;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text2);
+      background: rgba(14,14,20,0.85);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: 4px;
+      backdrop-filter: blur(8px);
+    }
+
+    .pulse-dot {
+      width: 6px; height: 6px;
+      background: #3dff8f;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #3dff8f;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* ── VIBE PANEL ── */
     #vibe-panel {
       position: fixed;
       bottom: 0; left: 0; right: 0;
       z-index: 100;
-      padding: 16px 20px 32px;
-      background: linear-gradient(to top, rgba(10,10,15,0.98) 70%, transparent);
+      padding: 0 0 env(safe-area-inset-bottom, 20px);
+    }
+
+    #vibe-panel-inner {
+      background: linear-gradient(to top, var(--bg) 0%, rgba(7,7,9,0.98) 70%, transparent 100%);
+      padding: 20px 18px 28px;
     }
 
     #vibe-label {
       font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2px;
+      font-size: 9px;
+      letter-spacing: 3px;
       color: var(--muted);
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
+      padding-left: 2px;
     }
 
     #vibe-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 8px;
+      gap: 7px;
       margin-bottom: 14px;
     }
 
@@ -122,76 +205,149 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 4px 8px;
+      border-radius: 10px;
+      padding: 11px 4px 9px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.15s ease;
       -webkit-tap-highlight-color: transparent;
+      position: relative;
+      overflow: hidden;
     }
 
-    .vibe-btn:active { transform: scale(0.92); }
+    .vibe-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent-dim);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .vibe-btn:active { transform: scale(0.91); }
 
     .vibe-btn.selected {
-      border-color: var(--accent);
-      background: rgba(124,109,250,0.15);
-      box-shadow: 0 0 12px rgba(124,109,250,0.25);
+      border-color: rgba(139,125,255,0.6);
+      background: var(--surface2);
+      box-shadow: 0 0 16px var(--accent-glow), inset 0 0 8px rgba(139,125,255,0.05);
     }
 
-    .vibe-emoji { font-size: 22px; line-height: 1; }
+    .vibe-btn.selected::before { opacity: 1; }
+
+    .vibe-emoji {
+      font-size: 21px;
+      line-height: 1;
+      filter: drop-shadow(0 0 4px rgba(255,255,255,0.1));
+    }
+
+    .vibe-btn.selected .vibe-emoji {
+      filter: drop-shadow(0 0 6px rgba(139,125,255,0.5));
+    }
+
     .vibe-name {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 9px;
+      font-family: 'DM Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.5px;
       color: var(--muted);
       text-align: center;
       line-height: 1;
+      text-transform: uppercase;
     }
 
-    .vibe-btn.selected .vibe-name { color: var(--accent); }
+    .vibe-btn.selected .vibe-name {
+      color: var(--accent);
+    }
 
+    /* ── DROP BUTTON ── */
     #drop-btn {
       width: 100%;
-      padding: 15px;
+      padding: 16px;
       background: var(--accent);
       color: #fff;
       border: none;
-      border-radius: 14px;
+      border-radius: 10px;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 18px;
-      letter-spacing: 3px;
+      font-size: 17px;
+      letter-spacing: 4px;
       cursor: pointer;
       transition: all 0.2s;
       -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 24px rgba(139,125,255,0.3);
+      position: relative;
+      overflow: hidden;
     }
+
+    #drop-btn::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+      transition: left 0.5s ease;
+    }
+
+    #drop-btn:not(:disabled):active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 12px rgba(139,125,255,0.25);
+    }
+
+    #drop-btn:not(:disabled):hover::after { left: 150%; }
 
     #drop-btn:disabled {
-      background: var(--border);
+      background: var(--surface2);
       color: var(--muted);
       cursor: default;
+      box-shadow: none;
+      border: 1px solid var(--border);
     }
 
-    #drop-btn:not(:disabled):active { transform: scale(0.97); }
+    /* ── LOCATE BTN ── */
+    #locate-btn {
+      position: fixed;
+      bottom: 220px;
+      right: 16px;
+      z-index: 100;
+      width: 42px; height: 42px;
+      background: rgba(14,14,20,0.9);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      backdrop-filter: blur(8px);
+      transition: all 0.15s;
+    }
+
+    #locate-btn:active {
+      background: var(--surface2);
+      border-color: var(--accent);
+    }
 
     /* ── TOAST ── */
     #toast {
       position: fixed;
-      top: 80px;
+      top: 76px;
       left: 50%;
-      transform: translateX(-50%) translateY(-10px);
-      background: var(--surface);
-      border: 1px solid var(--border);
+      transform: translateX(-50%) translateY(-8px);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
       color: var(--text);
       font-family: 'DM Mono', monospace;
-      font-size: 12px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
       padding: 10px 20px;
-      border-radius: 20px;
+      border-radius: 6px;
       opacity: 0;
-      transition: all 0.3s;
+      transition: all 0.25s ease;
       z-index: 200;
       white-space: nowrap;
       pointer-events: none;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
 
     #toast.show {
@@ -206,8 +362,8 @@
       z-index: 300;
       display: none;
       align-items: flex-end;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(6px);
     }
 
     #pro-modal.open { display: flex; }
@@ -215,45 +371,68 @@
     #pro-sheet {
       width: 100%;
       background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-radius: 20px 20px 0 0;
-      padding: 28px 24px 48px;
-      animation: slideUp 0.3s ease;
+      border-top: 1px solid var(--border2);
+      border-radius: 16px 16px 0 0;
+      padding: 32px 24px 52px;
+      animation: slideUp 0.28s cubic-bezier(0.22,1,0.36,1);
+      position: relative;
+    }
+
+    /* drag handle */
+    #pro-sheet::before {
+      content: '';
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 36px; height: 3px;
+      background: var(--border2);
+      border-radius: 2px;
     }
 
     @keyframes slideUp {
-      from { transform: translateY(100%); }
-      to { transform: translateY(0); }
+      from { transform: translateY(100%); opacity: 0.5; }
+      to { transform: translateY(0); opacity: 1; }
     }
 
     #pro-sheet h2 {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 32px;
-      letter-spacing: 2px;
+      font-size: 36px;
+      letter-spacing: 3px;
       color: var(--pro);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+      text-shadow: 0 0 24px var(--pro-glow);
     }
 
-    #pro-sheet p {
-      font-size: 14px;
-      color: var(--muted);
-      margin-bottom: 24px;
+    #pro-sheet .pro-tagline {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 28px;
       line-height: 1.5;
+      font-style: italic;
+    }
+
+    .pro-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
     }
 
     .pro-feature {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 14px;
-      font-size: 14px;
+      gap: 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.4;
     }
 
     .pro-feature-icon {
-      width: 36px; height: 36px;
-      background: rgba(245,200,66,0.1);
-      border: 1px solid rgba(245,200,66,0.2);
-      border-radius: 10px;
+      width: 38px; height: 38px;
+      background: var(--pro-dim);
+      border: 1px solid rgba(240,192,64,0.15);
+      border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
       font-size: 16px;
       flex-shrink: 0;
@@ -261,79 +440,46 @@
 
     #pro-cta {
       width: 100%;
-      margin-top: 24px;
-      padding: 16px;
+      margin-top: 28px;
+      padding: 17px;
       background: var(--pro);
-      color: #0a0a0f;
+      color: #070709;
       border: none;
-      border-radius: 14px;
+      border-radius: 10px;
       font-family: 'Bebas Neue', sans-serif;
       font-size: 18px;
       letter-spacing: 3px;
       cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 20px var(--pro-glow);
     }
+
+    #pro-cta:active { transform: scale(0.97); }
 
     #pro-close {
       position: absolute;
-      top: 20px; right: 20px;
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 22px;
+      top: 24px; right: 20px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 14px;
       cursor: pointer;
-      padding: 4px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      line-height: 1;
     }
 
     /* ── VIBE MARKER ── */
     .vibe-marker {
       font-size: 20px;
-      line-height: 1;
-      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7));
-      transition: transform 0.2s;
-      cursor: pointer;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.8));
+      animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
     }
 
-    /* ── LIVE PULSE ── */
-    #live-indicator {
-      position: fixed;
-      top: 72px;
-      right: 20px;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: 1px;
-    }
-
-    .pulse-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #4ade80;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    /* ── LOCATION PIN ── */
-    #locate-btn {
-      position: fixed;
-      bottom: 230px;
-      right: 20px;
-      z-index: 100;
-      width: 44px; height: 44px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
+    @keyframes popIn {
+      from { transform: scale(0) translateY(8px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
     }
   </style>
 </head>
@@ -344,7 +490,10 @@
 
 <!-- HEADER -->
 <div id="header">
-  <div id="logo">Vibe<span>Map</span></div>
+  <div>
+    <div id="logo">Vibe<span>Map</span></div>
+    <div id="logo-sub">Real-time mood</div>
+  </div>
   <button id="pro-btn">✦ VIBE PRO</button>
 </div>
 
@@ -359,50 +508,52 @@
 
 <!-- VIBE PANEL -->
 <div id="vibe-panel">
-  <div id="vibe-label">Drop your vibe</div>
-  <div id="vibe-grid">
-    <button class="vibe-btn" data-vibe="happy" data-emoji="😊">
-      <span class="vibe-emoji">😊</span>
-      <span class="vibe-name">Happy</span>
-    </button>
-    <button class="vibe-btn" data-vibe="chill" data-emoji="😌">
-      <span class="vibe-emoji">😌</span>
-      <span class="vibe-name">Chill</span>
-    </button>
-    <button class="vibe-btn" data-vibe="hyped" data-emoji="🔥">
-      <span class="vibe-emoji">🔥</span>
-      <span class="vibe-name">Hyped</span>
-    </button>
-    <button class="vibe-btn" data-vibe="sad" data-emoji="😢">
-      <span class="vibe-emoji">😢</span>
-      <span class="vibe-name">Sad</span>
-    </button>
-    <button class="vibe-btn" data-vibe="anxious" data-emoji="😰">
-      <span class="vibe-emoji">😰</span>
-      <span class="vibe-name">Anxious</span>
-    </button>
-    <button class="vibe-btn" data-vibe="angry" data-emoji="😤">
-      <span class="vibe-emoji">😤</span>
-      <span class="vibe-name">Angry</span>
-    </button>
-    <button class="vibe-btn" data-vibe="loved" data-emoji="🥰">
-      <span class="vibe-emoji">🥰</span>
-      <span class="vibe-name">Loved</span>
-    </button>
-    <button class="vibe-btn" data-vibe="bored" data-emoji="😑">
-      <span class="vibe-emoji">😑</span>
-      <span class="vibe-name">Bored</span>
-    </button>
-    <button class="vibe-btn" data-vibe="grateful" data-emoji="🙏">
-      <span class="vibe-emoji">🙏</span>
-      <span class="vibe-name">Grateful</span>
-    </button>
-    <button class="vibe-btn" data-vibe="lost" data-emoji="😵">
-      <span class="vibe-emoji">😵</span>
-      <span class="vibe-name">Lost</span>
-    </button>
+  <div id="vibe-panel-inner">
+    <div id="vibe-label">Drop your vibe</div>
+    <div id="vibe-grid">
+      <button class="vibe-btn" data-vibe="happy" data-emoji="😊">
+        <span class="vibe-emoji">😊</span>
+        <span class="vibe-name">Happy</span>
+      </button>
+      <button class="vibe-btn" data-vibe="chill" data-emoji="😌">
+        <span class="vibe-emoji">😌</span>
+        <span class="vibe-name">Chill</span>
+      </button>
+      <button class="vibe-btn" data-vibe="hyped" data-emoji="🔥">
+        <span class="vibe-emoji">🔥</span>
+        <span class="vibe-name">Hyped</span>
+      </button>
+      <button class="vibe-btn" data-vibe="sad" data-emoji="😢">
+        <span class="vibe-emoji">😢</span>
+        <span class="vibe-name">Sad</span>
+      </button>
+      <button class="vibe-btn" data-vibe="anxious" data-emoji="😰">
+        <span class="vibe-emoji">😰</span>
+        <span class="vibe-name">Anxious</span>
+      </button>
+      <button class="vibe-btn" data-vibe="angry" data-emoji="😤">
+        <span class="vibe-emoji">😤</span>
+        <span class="vibe-name">Angry</span>
+      </button>
+      <button class="vibe-btn" data-vibe="loved" data-emoji="🥰">
+        <span class="vibe-emoji">🥰</span>
+        <span class="vibe-name">Loved</span>
+      </button>
+      <button class="vibe-btn" data-vibe="bored" data-emoji="😑">
+        <span class="vibe-emoji">😑</span>
+        <span class="vibe-name">Bored</span>
+      </button>
+      <button class="vibe-btn" data-vibe="grateful" data-emoji="🙏">
+        <span class="vibe-emoji">🙏</span>
+        <span class="vibe-name">Grateful</span>
+      </button>
+      <button class="vibe-btn" data-vibe="lost" data-emoji="😵">
+        <span class="vibe-emoji">😵</span>
+        <span class="vibe-name">Lost</span>
+      </button>
+    </div>
+    <button id="drop-btn" disabled>SELECT A VIBE</button>
   </div>
-  <button id="drop-btn" disabled>SELECT A VIBE</button>
 </div>
 
 <!-- TOAST -->
@@ -410,10 +561,11 @@
 
 <!-- PRO MODAL -->
 <div id="pro-modal">
-  <div id="pro-sheet" style="position:relative">
+  <div id="pro-sheet">
     <button id="pro-close">✕</button>
     <h2>VIBE PRO ✦</h2>
-    <p>Unlock the full emotional spectrum and see who's vibing near you.</p>
+    <p class="pro-tagline">Unlock the full emotional spectrum and see who's vibing near you.</p>
+    <div class="pro-divider"></div>
     <div class="pro-feature">
       <div class="pro-feature-icon">🗺️</div>
       <div>Vibe heatmap overlay — see emotional density across cities</div>
@@ -457,7 +609,7 @@
   let userLat = null;
   let userLng = null;
   let cooldown = false;
-  const COOLDOWN_MS = 60000; // 1 min between drops
+  const COOLDOWN_MS = 60000;
 
   // ── VIBE SELECTION ──
   document.querySelectorAll('.vibe-btn').forEach(btn => {
@@ -570,7 +722,6 @@
       cooldown = true;
       setTimeout(() => { cooldown = false; }, COOLDOWN_MS);
 
-      // reset selection
       document.querySelectorAll('.vibe-btn').forEach(b => b.classList.remove('selected'));
       selectedVibe = null;
       selectedEmoji = null;
@@ -603,7 +754,7 @@
 
   // ── INIT ──
   loadVibes();
-  getLocation(); // prefetch location silently
+  getLocation();
 </script>
 </body>
 </html>
