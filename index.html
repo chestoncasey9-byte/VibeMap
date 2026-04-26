@@ -58,7 +58,7 @@
       z-index: 0;
     }
 
-    .leaflet-tile-pane { filter: brightness(0.35) saturate(0.5) hue-rotate(10deg); }
+    .leaflet-tile-pane { filter: none; }
     .leaflet-control-zoom { display: none; }
     .leaflet-control-attribution { display: none; }
 
@@ -180,7 +180,7 @@
     }
 
     #vibe-panel-inner {
-      background: linear-gradient(to top, var(--bg) 0%, rgba(7,7,9,0.98) 70%, transparent 100%);
+      background: linear-gradient(to top, var(--bg) 0%, rgba(7,7,9,0.99) 65%, rgba(7,7,9,0.7) 85%, transparent 100%);
       padding: 20px 18px 28px;
     }
 
@@ -226,6 +226,7 @@
       transition: opacity 0.15s;
     }
 
+    .vibe-btn:hover { border-color: var(--border2); background: var(--surface2); }
     .vibe-btn:active { transform: scale(0.91); }
 
     .vibe-btn.selected {
@@ -292,6 +293,7 @@
     #drop-btn:not(:disabled):active {
       transform: scale(0.97);
       box-shadow: 0 2px 12px rgba(139,125,255,0.25);
+      background: #7a6cee;
     }
 
     #drop-btn:not(:disabled):hover::after { left: 150%; }
@@ -599,7 +601,7 @@
     attributionControl: false,
   }).setView([20, 0], 2);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     maxZoom: 19
   }).addTo(map);
 
@@ -748,13 +750,17 @@
       document.getElementById('pro-modal').classList.remove('open');
   });
   document.getElementById('pro-cta').addEventListener('click', () => {
-  window.open('https://buy.stripe.com/test_eVqdR93lLf2c0AMgEx5J600', '_blank');
-  
+    window.open('https://buy.stripe.com/test_eVqdR93lLf2c0AMgEx5J600', '_blank');
   });
 
   // ── INIT ──
   loadVibes();
   getLocation();
+
+  // ── SERVICE WORKER ──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(console.error);
+  }
 </script>
 </body>
-        </html>
+          </html>
